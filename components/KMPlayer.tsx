@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause } from 'lucide-react';
-import Controls, { AudioTrack } from './Controls';
+import Controls, { AudioTrack, SubtitleTrack } from './Controls';
 import usePlayerShortcuts from '../hooks/usePlayerShortcuts';
 import { VideoBufferManager } from '../utils/mseBufferLogic';
 
@@ -70,15 +70,18 @@ function buildModeUrl(
     transcodeStartTime: number,
     transcodeRevision: number,
     audioIndex: number | null,
+    subtitleIndex: number | null,
 ): string | undefined {
     switch (mode) {
         case 'direct':
             return srcUrl;
         case 'proxy':
-            return `/api/stream?url=${encodeURIComponent(srcUrl)}`;
+            return `/api/download-stream?url=${encodeURIComponent(srcUrl)}`;
         case 'transcode':
-            const base = `/api/transcode?url=${encodeURIComponent(srcUrl)}&time=${transcodeStartTime.toFixed(3)}&r=${transcodeRevision}`;
-            return audioIndex !== null ? `${base}&audioIndex=${audioIndex}` : base;
+            let base = `/api/transcode?url=${encodeURIComponent(srcUrl)}&time=${transcodeStartTime.toFixed(3)}&r=${transcodeRevision}`;
+            if (audioIndex !== null) base += `&audioIndex=${audioIndex}`;
+            if (subtitleIndex !== null) base += `&subtitleIndex=${subtitleIndex}`;
+            return base;
         case 'failed':
             return undefined;
         default:
@@ -119,11 +122,15 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
     const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
 
+    // Subtitle Tracks (Embedded)
+    const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+    const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
+
     // MSE state
     const mseManagerRef = useRef<VideoBufferManager | null>(null);
     const [mseUrl, setMseUrl] = useState<string | null>(null);
 
-    // Subtitle state
+    // Subtitle state (Custom external)
     const [subtitleUrl, setSubtitleUrl] = useState<string>('');
     const [showSubtitleInput, setShowSubtitleInput] = useState(false);
 
@@ -134,24 +141,31 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     const playOverlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [bufferedEnd, setBufferedEnd] = useState(0);
 
-    // Fetch media info on load to populate audio tracks
+    // Fetch media info on load to populate audio/subtitle tracks
     useEffect(() => {
         if (!srcUrl) return;
-
-        // Reset tracks on new URL
-
 
         const fetchInfo = async () => {
             try {
                 const res = await fetch(`/api/media-info?url=${encodeURIComponent(srcUrl)}`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = (await res.json()) as {
+                        audioTracks: AudioTrack[],
+                        allTracks: Array<{ type: string } & SubtitleTrack>
+                    };
+
+                    // Audio tracks
                     if (data.audioTracks && Array.isArray(data.audioTracks)) {
                         setAudioTracks(data.audioTracks);
-                        // Default to first track if available, or stay null to let backend decide
                         if (data.audioTracks.length > 0) {
                             setSelectedAudioIndex(data.audioTracks[0].index);
                         }
+                    }
+
+                    // Subtitle tracks
+                    if (data.allTracks && Array.isArray(data.allTracks)) {
+                        const subs = data.allTracks.filter((t) => t.type === 'subtitle');
+                        setSubtitleTracks(subs);
                     }
                 }
             } catch (e) {
@@ -162,8 +176,8 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     }, [srcUrl]);
 
     const finalUrl = useMemo(
-        () => buildModeUrl(mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex),
-        [mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex],
+        () => buildModeUrl(mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex, selectedSubtitleIndex),
+        [mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex, selectedSubtitleIndex],
     );
 
     useEffect(() => {
@@ -788,6 +802,23 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 onFullscreenToggle={toggleFullscreen}
                 onSubtitleToggle={handleSubtitleToggle}
                 hasSubtitles={!!subtitleUrl}
+                subtitleTracks={subtitleTracks}
+                selectedSubtitleIndex={selectedSubtitleIndex}
+                onSubtitleTrackChange={(index) => {
+                    setSelectedSubtitleIndex(index);
+                    if (index !== null) {
+                        // Force transcode mode if embedded subtitle is selected
+                        setTranscodeRevision(prev => prev + 1);
+                        setStatusMessage('Burning in subtitles...');
+                        if (mode !== 'transcode') {
+                            setMode('transcode');
+                        }
+                    } else if (mode === 'transcode' && selectedAudioIndex !== null) {
+                        // If unselecting subs but still in transcode (e.g. for audio), just reload
+                        setTranscodeRevision(prev => prev + 1);
+                        setStatusMessage('Turning off subtitles...');
+                    }
+                }}
                 isVisible={showControls}
                 audioTracks={audioTracks}
                 selectedAudioIndex={selectedAudioIndex}

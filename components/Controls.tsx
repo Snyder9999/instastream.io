@@ -24,6 +24,13 @@ export interface AudioTrack {
     codec: string;
 }
 
+export interface SubtitleTrack {
+    index: number;
+    label?: string;
+    language?: string;
+    codec: string;
+}
+
 interface ControlsProps {
     isPlaying: boolean;
     onPlayPause: () => void;
@@ -35,8 +42,14 @@ interface ControlsProps {
     onVolumeChange: (volume: number) => void;
     isFullscreen: boolean;
     onFullscreenToggle: () => void;
-    onSubtitleToggle: () => void;
-    hasSubtitles: boolean;
+
+    // Subtitles
+    onSubtitleToggle: () => void; // Opens custom sub modal
+    hasSubtitles: boolean; // True if custom sub loaded
+    subtitleTracks?: SubtitleTrack[];
+    selectedSubtitleIndex?: number | null;
+    onSubtitleTrackChange?: (index: number | null) => void;
+
     isVisible: boolean;
     audioTracks?: AudioTrack[];
     selectedAudioIndex?: number | null;
@@ -80,6 +93,9 @@ const Controls: React.FC<ControlsProps> = ({
     onFullscreenToggle,
     onSubtitleToggle,
     hasSubtitles,
+    subtitleTracks = [],
+    selectedSubtitleIndex,
+    onSubtitleTrackChange,
     isVisible,
     audioTracks = [],
     selectedAudioIndex,
@@ -91,6 +107,7 @@ const Controls: React.FC<ControlsProps> = ({
     bufferedEnd = 0,
 }) => {
     const [showAudioMenu, setShowAudioMenu] = useState(false);
+    const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [isHoveringProgress, setIsHoveringProgress] = useState(false);
@@ -422,13 +439,74 @@ const Controls: React.FC<ControlsProps> = ({
                         )}
 
                         {/* Subtitles */}
-                        <button
-                            onClick={onSubtitleToggle}
-                            className={`transition-colors ${hasSubtitles ? 'text-[#E50914]' : 'text-white hover:text-white/80'}`}
-                            aria-label="Toggle subtitles"
-                        >
-                            <Captions size={22} />
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => {
+                                    if (subtitleTracks && subtitleTracks.length > 0) {
+                                        setShowSubtitleMenu(!showSubtitleMenu);
+                                    } else {
+                                        onSubtitleToggle();
+                                    }
+                                }}
+                                className={`transition-colors ${hasSubtitles || selectedSubtitleIndex !== null || showSubtitleMenu ? 'text-[#E50914]' : 'text-white hover:text-white/80'}`}
+                                aria-label="Subtitles"
+                            >
+                                <Captions size={22} />
+                            </button>
+
+                            {showSubtitleMenu && (
+                                <div className="absolute bottom-full mb-3 right-0 bg-black/95 border border-white/10 rounded-lg shadow-2xl overflow-hidden min-w-[200px] z-50">
+                                    <div className="px-3 py-2 text-xs text-white/50 uppercase tracking-wider border-b border-white/10">
+                                        Subtitles
+                                    </div>
+
+                                    {/* Off Option */}
+                                    <button
+                                        onClick={() => {
+                                            onSubtitleTrackChange?.(null);
+                                            setShowSubtitleMenu(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${selectedSubtitleIndex === null && !hasSubtitles
+                                            ? 'text-[#E50914] font-semibold'
+                                            : 'text-white/80'
+                                            }`}
+                                    >
+                                        Off
+                                    </button>
+
+                                    {/* Embedded Tracks */}
+                                    {subtitleTracks.map((track) => (
+                                        <button
+                                            key={track.index}
+                                            onClick={() => {
+                                                onSubtitleTrackChange?.(track.index);
+                                                setShowSubtitleMenu(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${selectedSubtitleIndex === track.index
+                                                ? 'text-[#E50914] font-semibold'
+                                                : 'text-white/80'
+                                                }`}
+                                        >
+                                            {track.label || track.language || `Track ${track.index}`}
+                                            {track.codec ? ` (${track.codec})` : ''}
+                                        </button>
+                                    ))}
+
+                                    <div className="border-t border-white/10 my-1"></div>
+
+                                    {/* Load External */}
+                                    <button
+                                        onClick={() => {
+                                            onSubtitleToggle();
+                                            setShowSubtitleMenu(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${hasSubtitles && selectedSubtitleIndex === null ? 'text-[#E50914]' : 'text-white/80'}`}
+                                    >
+                                        {hasSubtitles ? 'External Loaded' : 'Load External...'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Fullscreen */}
                         <button

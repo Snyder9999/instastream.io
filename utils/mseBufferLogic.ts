@@ -67,8 +67,41 @@ export class VideoBufferManager {
                 this.isUpdating = false; // Reset if append fails synchronously
 
                 if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-                    this.cleanupBuffer(10); // Clear 10 seconds
-                    this.queue.unshift(data); // Retry
+                    // Quota Hit! 
+                    // 1. Try standard cleanup (prunes forward > 30s, keeps backward 300s)
+                    let freed = this.cleanupBuffer(300);
+
+                    // 2. If that failed, it means we don't have >30s forward buffer to prune.
+                    //    We must sacrifice backward buffer. Try keeping only 60s.
+                    if (!freed) {
+                        console.warn('Quota full, reducing backward buffer to 60s...');
+                        freed = this.cleanupBuffer(60);
+                    }
+
+                    // 3. If still full, emergency prune: keep only 10s backward.
+                    if (!freed) {
+                        console.warn('Quota critical, reducing backward buffer to 10s...');
+                        freed = this.cleanupBuffer(10);
+                    }
+
+                    if (freed) {
+                        // If we successfully started a remove op, 'isUpdating' is true. 
+                        // The 'updateend' will trigger processQueue again, which will naturally retry this chunk.
+                        this.queue.unshift(data);
+                    } else {
+                        // We couldn't free space. This is critical.
+                        // We can wait a bit or just drop the chunk? Dropping causes gaps.
+                        // For now, let's retry after a delay to see if playback advances
+                        console.warn('Quota reached and unable to free buffer. Retrying in 1s...');
+                        setTimeout(() => {
+                            if (this.queue.length > 0 && this.queue[0] === data) {
+                                this.processQueue();
+                            } else {
+                                this.queue.unshift(data);
+                                this.processQueue();
+                            }
+                        }, 1000);
+                    }
                 }
             }
         }
@@ -79,26 +112,59 @@ export class VideoBufferManager {
         this.processQueue();
     }
 
-    public cleanupBuffer(secondsToKeep = 60) {
-        if (!this.sourceBuffer || this.isUpdating || this.mediaSource.readyState !== 'open') return;
+    public cleanupBuffer(secondsToKeepBackward = 300): boolean {
+        if (!this.sourceBuffer || this.isUpdating || this.mediaSource.readyState !== 'open') return false;
 
         try {
             const currentTime = this.getCurrentTime();
             const buffered = this.sourceBuffer.buffered;
 
+            // Strategy:
+            // 1. First, try to remove far-future content (forward buffer) to relieve pressure.
+            //    This preserves the "rewind" capability (backward buffer) as the priority.
+            // 2. If that doesn't free enough space or isn't applicable, THEN prune backward buffer.
+
+            const MAX_FORWARD_BUFFER = 30; // Keep at most 30s ahead to be safe
+
+            // Phase 1: Forward Pruning (Sacrifice future for past)
             for (let i = 0; i < buffered.length; i++) {
                 const start = buffered.start(i);
                 const end = buffered.end(i);
 
-                const removeEnd = currentTime - secondsToKeep;
+                // If range is entirely in future beyond safe limit
+                if (start > currentTime + MAX_FORWARD_BUFFER) {
+                    this.sourceBuffer.remove(start, end);
+                    this.isUpdating = true;
+                    return true;
+                }
+
+                // If range overlaps cursor but extends too far
+                if (start <= currentTime + MAX_FORWARD_BUFFER && end > currentTime + MAX_FORWARD_BUFFER) {
+                    this.sourceBuffer.remove(currentTime + MAX_FORWARD_BUFFER, end);
+                    this.isUpdating = true;
+                    return true;
+                }
+            }
+
+            // Phase 2: Backward Pruning (Only if Phase 1 didn't trigger)
+            // We only do this if we are FORCED to (e.g. quota exceeded calls this with a lower secondsToKeep)
+            // or if we are just regularly maintaining the window.
+            for (let i = 0; i < buffered.length; i++) {
+                const start = buffered.start(i);
+                const end = buffered.end(i);
+                const removeEnd = currentTime - secondsToKeepBackward;
+
                 if (removeEnd > start) {
                     this.sourceBuffer.remove(start, Math.min(end, removeEnd));
                     this.isUpdating = true;
-                    return;
+                    return true;
                 }
             }
+
+            return false;
         } catch (e) {
             console.error('Error cleaning buffer:', e);
+            return false;
         }
     }
 

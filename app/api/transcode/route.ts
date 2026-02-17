@@ -52,8 +52,9 @@ function parseStartTime(raw: string | null): string | null {
 export async function GET(req: NextRequest) {
   const sourceUrl = req.nextUrl.searchParams.get("url");
   const startTime = parseStartTime(req.nextUrl.searchParams.get("time"));
-  // Reusing parseStartTime for basic number parsing, though strictly it allows floats which is fine
+  // Audio and Subtitle indices are global stream indices (from ffprobe)
   const audioIndex = req.nextUrl.searchParams.get("audioIndex");
+  const subtitleIndex = req.nextUrl.searchParams.get("subtitleIndex");
 
   if (!sourceUrl) {
     return jsonError(400, {
@@ -185,8 +186,8 @@ export async function GET(req: NextRequest) {
       "-keyint_min 48",
       "-force_key_frames expr:gte(t,n_forced*2)",
       "-sc_threshold 0",
-      // Audio mapping logic:
-      ...(audioIndex ? ["-map 0:v:0", `-map 0:a:${audioIndex}`] : ["-map 0:v:0", "-map 0:a:0?"]),
+      // Audio mapping logic: Use global index if provided, else default to first audio stream
+      ...(audioIndex ? ["-map 0:v:0", `-map 0:${audioIndex}`] : ["-map 0:v:0", "-map 0:a:0?"]),
       "-c:a aac",
       "-ac 2",
       "-f mp4",
@@ -197,6 +198,15 @@ export async function GET(req: NextRequest) {
       "-avoid_negative_ts make_zero",
       "-reset_timestamps 1",
     ];
+
+    // Subtitle Burning Logic
+    if (subtitleIndex !== null) {
+      // We use the subtitles filter to burn them in.
+      // We explicitly wrap the URL in single quotes and escape internal single quotes.
+      const escapedUrl = normalizedUrl.replace(/'/g, "'\\''");
+      const filter = `subtitles='${escapedUrl}':si=${subtitleIndex}`;
+      outputOptions.push("-vf", filter);
+    }
 
     ffmpegCommand = ffmpeg(normalizedUrl)
       .inputOptions(inputOptions)
