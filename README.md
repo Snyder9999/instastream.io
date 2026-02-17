@@ -1,51 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# InstaStream.io
+
+A web-based video streaming application that lets you instantly stream large video files from direct URLs — no downloads required. Paste a video URL, hit **Stream**, and watch it play in a custom KMPlayer-inspired interface with keyboard shortcuts, subtitle support, and automatic format transcoding.
+
+## Features
+
+- **Direct URL Streaming** — Paste any direct video URL (MP4, MKV, etc.) and start watching immediately.
+- **Smart Playback Pipeline** — Automatically tries Direct Play → Proxy → Server-side Transcoding, falling back gracefully when needed.
+- **Custom Video Player** — A KMPlayer-inspired UI with no default browser controls.
+- **Keyboard Shortcuts** — Desktop-style controls: Space (play/pause), Arrow keys (seek), Shift+/- (speed), M (mute), F (fullscreen).
+- **Server-side Transcoding** — Unsupported formats (e.g. MKV with non-browser codecs) are transcoded on-the-fly to fragmented MP4 via FFmpeg.
+- **Subtitle Support** — Search and load subtitles via the OpenSubtitles API, with SRT-to-VTT conversion built in.
+- **URL Normalization** — Auto-unwraps known wrapper URLs (e.g. `video-seed.dev/?url=...`) and rejects non-media sources with clear error messages.
+- **Concurrency Control** — Configurable limit on simultaneous FFmpeg transcoding sessions (`MAX_ACTIVE_TRANSCODES`).
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | [Next.js 16](https://nextjs.org) (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 |
+| Transcoding | FFmpeg via `fluent-ffmpeg` |
+| Icons | Lucide React |
+| Player | Native HTML5 `<video>` + Media Source Extensions (MSE) |
+| Subtitles | OpenSubtitles REST API v1 |
+
+## Prerequisites
+
+Before running the project locally, make sure you have:
+
+- **Node.js** v18 or later — [Download](https://nodejs.org/)
+- **FFmpeg** installed and available on your system `PATH` — [Download](https://ffmpeg.org/download.html)
+  - Verify with: `ffmpeg -version`
+- **Git** — [Download](https://git-scm.com/)
 
 ## Getting Started
 
-First, run the development server:
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Snyder9999/instastream.io.git
+cd instastream.io
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Use the app
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Paste a direct video URL into the input field on the landing page.
+2. Click **Stream**.
+3. The player will attempt direct playback first, then fall back to the proxy or transcoding pipeline as needed.
+4. Use keyboard shortcuts to control playback.
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+├── app/
+│   ├── page.tsx                    # Landing page with URL input
+│   ├── layout.tsx                  # Root layout
+│   ├── globals.css                 # Global styles
+│   └── api/
+│       ├── stream/route.ts         # HTTP Range proxy for direct streaming
+│       ├── transcode/route.ts      # FFmpeg transcoding pipeline
+│       ├── media-info/route.ts     # Media metadata probe endpoint
+│       └── subtitles/route.ts      # OpenSubtitles API proxy
+├── components/
+│   ├── KMPlayer.tsx                # Core video player + fallback logic
+│   ├── Controls.tsx                # Play, pause, volume, seek UI
+│   └── PlayerLayout.tsx            # Player wrapper layout
+├── hooks/
+│   └── usePlayerShortcuts.ts       # Keyboard shortcut engine
+├── utils/
+│   ├── mediaUrl.ts                 # URL normalization & media validation
+│   ├── mediaProbe.ts               # FFprobe media info utility
+│   ├── mseBufferLogic.ts           # MSE chunk buffering & back-buffer cleanup
+│   ├── upstreamFetch.ts            # Upstream fetch with header forwarding
+│   └── srtToVtt.ts                 # SRT → WebVTT subtitle converter
+└── public/                         # Static assets
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Available Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the development server |
+| `npm run build` | Create a production build |
+| `npm start` | Run the production server |
+| `npm run lint` | Run ESLint |
 
-## Deploy on Vercel
+## Keyboard Shortcuts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Key | Action |
+|-----|--------|
+| `Space` | Play / Pause |
+| `←` / `→` | Seek backward / forward 5s |
+| `↑` / `↓` | Volume up / down |
+| `Shift` + `+` / `-` | Increase / decrease playback speed |
+| `M` | Toggle mute |
+| `F` | Toggle fullscreen |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Environment Variables (Optional)
 
-## Streaming Pipeline Notes
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_ACTIVE_TRANSCODES` | `4` | Maximum concurrent FFmpeg transcoding sessions |
 
-- Source URL normalization now auto-unwraps known wrappers like `video-seed.dev/?url=...` before proxying or transcoding.
-- Non-media sources are rejected with `422` JSON responses:
-  - `{"code":"SOURCE_NOT_MEDIA","message":"...","sourceUrl":"...","normalizedUrl":"..."}`
-- `GET /api/stream` now preserves upstream MIME type and supports requests with or without `Range`.
-- `GET /api/transcode` now has:
-  - Input preflight validation
-  - Request-scoped FFmpeg cleanup on abort/close/error
-  - Optional concurrency cap via `MAX_ACTIVE_TRANSCODES` (default `4`)
+## Production Notes
 
-## Production Deployment Warning
+> ⚠️ Long-lived FFmpeg transcoding streams are **not** a good fit for Vercel Serverless/Edge function limits. For production, run transcoding on dedicated compute (container, VM, or worker service) and keep Next.js API routes as control/proxy endpoints.
 
-Long-lived FFmpeg transcoding streams are generally not a good fit for Vercel Serverless/Edge function limits. For production, run transcoding on dedicated compute (container/VM/worker service) and keep Next.js API routes as control/proxy endpoints.
+## License
+
+This project is private and not currently licensed for public distribution.
