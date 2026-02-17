@@ -139,8 +139,7 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
         if (!srcUrl) return;
 
         // Reset tracks on new URL
-        setAudioTracks([]);
-        setSelectedAudioIndex(null);
+
 
         const fetchInfo = async () => {
             try {
