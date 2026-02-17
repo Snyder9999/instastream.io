@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Controls from './Controls';
+import Controls, { AudioTrack } from './Controls';
 import usePlayerShortcuts from '../hooks/usePlayerShortcuts';
+import { VideoBufferManager } from '../utils/mseBufferLogic';
 
 interface KMPlayerProps {
     srcUrl: string;
@@ -67,6 +68,7 @@ function buildModeUrl(
     srcUrl: string,
     transcodeStartTime: number,
     transcodeRevision: number,
+    audioIndex: number | null,
 ): string | undefined {
     switch (mode) {
         case 'direct':
@@ -74,7 +76,8 @@ function buildModeUrl(
         case 'proxy':
             return `/api/stream?url=${encodeURIComponent(srcUrl)}`;
         case 'transcode':
-            return `/api/transcode?url=${encodeURIComponent(srcUrl)}&time=${transcodeStartTime.toFixed(3)}&r=${transcodeRevision}`;
+            const base = `/api/transcode?url=${encodeURIComponent(srcUrl)}&time=${transcodeStartTime.toFixed(3)}&r=${transcodeRevision}`;
+            return audioIndex !== null ? `${base}&audioIndex=${audioIndex}` : base;
         case 'failed':
             return undefined;
         default:
@@ -103,7 +106,7 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     const [volume, setVolume] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
-    const [isSeeking, setIsSeeking] = useState(false);
+    const [isSeeking, setIsSeeking] = useState(false); // UI seeking state
 
     // Playback mode state machine: direct -> proxy -> transcode -> failed
     const [mode, setMode] = useState<PlaybackMode>('direct');
@@ -111,10 +114,94 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     const [transcodeStartTime, setTranscodeStartTime] = useState(0);
     const [transcodeRevision, setTranscodeRevision] = useState(0);
 
+    // Audio Tracks
+    const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+    const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
+
+    // MSE state
+    const mseManagerRef = useRef<VideoBufferManager | null>(null);
+    const [mseUrl, setMseUrl] = useState<string | null>(null);
+
+    // Subtitle state
+    const [subtitleUrl, setSubtitleUrl] = useState<string>('');
+    const [showSubtitleInput, setShowSubtitleInput] = useState(false);
+
+    // Fetch media info on load to populate audio tracks
+    useEffect(() => {
+        if (!srcUrl) return;
+
+        // Reset tracks on new URL
+        setAudioTracks([]);
+        setSelectedAudioIndex(null);
+
+        const fetchInfo = async () => {
+            try {
+                const res = await fetch(`/api/media-info?url=${encodeURIComponent(srcUrl)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.audioTracks && Array.isArray(data.audioTracks)) {
+                        setAudioTracks(data.audioTracks);
+                        // Default to first track if available, or stay null to let backend decide
+                        if (data.audioTracks.length > 0) {
+                            setSelectedAudioIndex(data.audioTracks[0].index);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch media info:', e);
+            }
+        };
+        fetchInfo();
+    }, [srcUrl]);
+
     const finalUrl = useMemo(
-        () => buildModeUrl(mode, srcUrl, transcodeStartTime, transcodeRevision),
-        [mode, srcUrl, transcodeStartTime, transcodeRevision],
+        () => buildModeUrl(mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex),
+        [mode, srcUrl, transcodeStartTime, transcodeRevision, selectedAudioIndex],
     );
+
+    useEffect(() => {
+        if (mode === 'transcode' && finalUrl) {
+            // Initialize MSE
+            if (mseManagerRef.current) {
+                mseManagerRef.current.destroy();
+            }
+            const manager = new VideoBufferManager(() => videoRef.current?.currentTime || 0);
+            mseManagerRef.current = manager;
+            setMseUrl(manager.getUrl());
+            manager.startFetching(finalUrl);
+
+            return () => {
+                if (mseManagerRef.current) {
+                    mseManagerRef.current.destroy();
+                    mseManagerRef.current = null;
+                }
+                setMseUrl(null);
+            };
+        } else {
+            // Cleanup MSE if switching away from transcode
+            if (mseManagerRef.current) {
+                mseManagerRef.current.destroy();
+                mseManagerRef.current = null;
+            }
+            setMseUrl(null);
+        }
+    }, [mode, finalUrl]);
+
+    const handleSubtitleToggle = useCallback(() => {
+        setShowSubtitleInput(prev => !prev);
+    }, []);
+
+    const handleSubtitleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const url = formData.get('subtitleUrl') as string;
+        if (url) {
+            setSubtitleUrl(url);
+            setShowSubtitleInput(false);
+            setStatusMessage('Subtitles loaded.');
+            setTimeout(() => setStatusMessage(null), 3000);
+        }
+    };
 
     const clearStallRecoveryTimer = useCallback(() => {
         if (!stallRecoveryTimerRef.current) return;
@@ -570,9 +657,17 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 onClick={togglePlay}
                 autoPlay
                 playsInline
-                src={finalUrl}
+                src={mode === 'transcode' ? (mseUrl ?? undefined) : finalUrl}
                 crossOrigin="anonymous"
             >
+                {subtitleUrl && (
+                    <track
+                        kind="subtitles"
+                        src={`/api/subtitles?url=${encodeURIComponent(subtitleUrl)}`}
+                        label="English"
+                        default
+                    />
+                )}
                 Your browser does not support the video tag.
             </video>
 
@@ -586,7 +681,20 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 onVolumeChange={handleVolume}
                 isFullscreen={isFullscreen}
                 onFullscreenToggle={toggleFullscreen}
+                onSubtitleToggle={handleSubtitleToggle}
+                hasSubtitles={!!subtitleUrl}
                 isVisible={showControls}
+                audioTracks={audioTracks}
+                selectedAudioIndex={selectedAudioIndex}
+                onAudioTrackChange={(index) => {
+                    setSelectedAudioIndex(index);
+                    // Force reload if in transcode mode by bumping revision or just letting dependency update
+                    // Dependency update on finalUrl -> useEffect -> MSE reload
+                    if (mode === 'transcode') {
+                        setTranscodeRevision(prev => prev + 1);
+                        setStatusMessage('Switching audio track...');
+                    }
+                }}
             />
 
             {mode === 'proxy' && (
@@ -604,6 +712,36 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
             {isSeeking && (
                 <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded opacity-90 pointer-events-none z-10">
                     Seeking...
+                </div>
+            )}
+
+            {showSubtitleInput && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                    <form onSubmit={handleSubtitleSubmit} className="bg-gray-900 p-6 rounded-xl border border-gray-700 space-y-4 w-96">
+                        <h3 className="text-white font-semibold">Load Subtitles (SRT/VTT)</h3>
+                        <input
+                            name="subtitleUrl"
+                            type="url"
+                            placeholder="https://example.com/subs.srt"
+                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowSubtitleInput(false)}
+                                className="px-3 py-1 text-gray-400 hover:text-white"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500"
+                            >
+                                Load
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 

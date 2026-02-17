@@ -1,7 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Music } from 'lucide-react';
+
+export interface AudioTrack {
+    index: number;
+    label?: string;
+    language?: string;
+    codec: string;
+}
 
 interface ControlsProps {
     isPlaying: boolean;
@@ -13,7 +20,12 @@ interface ControlsProps {
     onVolumeChange: (volume: number) => void;
     isFullscreen: boolean;
     onFullscreenToggle: () => void;
-    isVisible: boolean; // Controls fade out logic handled by parent or CSS
+    onSubtitleToggle: () => void;
+    hasSubtitles: boolean;
+    isVisible: boolean;
+    audioTracks?: AudioTrack[];
+    selectedAudioIndex?: number | null;
+    onAudioTrackChange?: (index: number) => void;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -26,8 +38,14 @@ const Controls: React.FC<ControlsProps> = ({
     onVolumeChange,
     isFullscreen,
     onFullscreenToggle,
-    isVisible
+    onSubtitleToggle,
+    hasSubtitles,
+    isVisible,
+    audioTracks = [],
+    selectedAudioIndex,
+    onAudioTrackChange
 }) => {
+    const [showAudioMenu, setShowAudioMenu] = React.useState(false);
 
     // Helper to format time (e.g. 1:30)
     const formatTime = (time: number) => {
@@ -80,7 +98,6 @@ const Controls: React.FC<ControlsProps> = ({
                             >
                                 {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                             </button>
-                            {/* Simple volume slider that appears on hover/group-hover could be fancy, but stick to visible for now */}
                             <input
                                 type="range"
                                 min="0"
@@ -98,7 +115,46 @@ const Controls: React.FC<ControlsProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 relative">
+                        {/* Audio Tracks */}
+                        {audioTracks.length > 1 && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowAudioMenu(!showAudioMenu)}
+                                    className={`transition-colors ${showAudioMenu ? 'text-blue-400' : 'text-white hover:text-blue-400'}`}
+                                    title="Audio Tracks"
+                                >
+                                    <Music size={20} />
+                                </button>
+                                {showAudioMenu && (
+                                    <div className="absolute bottom-full mb-2 right-0 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden min-w-[160px] z-50">
+                                        {audioTracks.map((track) => (
+                                            <button
+                                                key={track.index}
+                                                onClick={() => {
+                                                    onAudioTrackChange?.(track.index);
+                                                    setShowAudioMenu(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${selectedAudioIndex === track.index ? 'text-blue-400 font-bold' : 'text-gray-200'}`}
+                                            >
+                                                {track.label || track.language || `Track ${track.index}`}
+                                                {track.language ? ` (${track.language})` : ''}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Subtitles */}
+                        <button
+                            onClick={onSubtitleToggle}
+                            className={`transition-colors ${hasSubtitles ? 'text-blue-400' : 'text-white hover:text-blue-400'}`}
+                            title="Toggle Subtitles"
+                        >
+                            <Captions size={20} />
+                        </button>
+
                         {/* Fullscreen */}
                         <button
                             onClick={onFullscreenToggle}

@@ -10,6 +10,7 @@ import {
   MediaValidationError,
   normalizeMediaUrl,
 } from "@/utils/mediaUrl";
+import { buildUpstreamReferer, DEFAULT_UPSTREAM_USER_AGENT } from "@/utils/upstreamFetch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,6 +52,8 @@ function parseStartTime(raw: string | null): string | null {
 export async function GET(req: NextRequest) {
   const sourceUrl = req.nextUrl.searchParams.get("url");
   const startTime = parseStartTime(req.nextUrl.searchParams.get("time"));
+  // Reusing parseStartTime for basic number parsing, though strictly it allows floats which is fine
+  const audioIndex = req.nextUrl.searchParams.get("audioIndex");
 
   if (!sourceUrl) {
     return jsonError(400, {
@@ -119,6 +122,7 @@ export async function GET(req: NextRequest) {
   const stream = new PassThrough();
   let ffmpegCommand: ffmpeg.FfmpegCommand | null = null;
   let cleanedUp = false;
+  const upstreamReferer = buildUpstreamReferer(normalizedUrl);
 
   activeTranscodes += 1;
   logLine(
@@ -157,31 +161,46 @@ export async function GET(req: NextRequest) {
   });
 
   try {
+    const inputOptions = [
+      "-ss",
+      startTime,
+      "-user_agent",
+      DEFAULT_UPSTREAM_USER_AGENT,
+      "-rw_timeout",
+      "15000000",
+      "-fflags",
+      "+genpts+discardcorrupt",
+    ];
+
+    if (upstreamReferer) {
+      inputOptions.push("-referer", upstreamReferer);
+    }
+
+    const outputOptions = [
+      "-c:v libx264",
+      "-preset ultrafast",
+      "-tune zerolatency",
+      "-pix_fmt yuv420p",
+      "-g 48",
+      "-keyint_min 48",
+      "-force_key_frames expr:gte(t,n_forced*2)",
+      "-sc_threshold 0",
+      // Audio mapping logic:
+      ...(audioIndex ? ["-map 0:v:0", `-map 0:a:${audioIndex}`] : ["-map 0:v:0", "-map 0:a:0?"]),
+      "-c:a aac",
+      "-ac 2",
+      "-f mp4",
+      "-frag_duration 2000000",
+      "-min_frag_duration 500000",
+      "-movflags frag_keyframe+empty_moov+default_base_moof",
+      "-max_muxing_queue_size 2048",
+      "-avoid_negative_ts make_zero",
+      "-reset_timestamps 1",
+    ];
+
     ffmpegCommand = ffmpeg(normalizedUrl)
-      .inputOptions([
-        `-ss ${startTime}`,
-        "-rw_timeout 15000000",
-        "-fflags +genpts+discardcorrupt",
-      ])
-      .outputOptions([
-        "-c:v libx264",
-        "-preset ultrafast",
-        "-tune zerolatency",
-        "-pix_fmt yuv420p",
-        "-g 48",
-        "-keyint_min 48",
-        "-force_key_frames expr:gte(t,n_forced*2)",
-        "-sc_threshold 0",
-        "-c:a aac",
-        "-ac 2",
-        "-f mp4",
-        "-frag_duration 2000000",
-        "-min_frag_duration 500000",
-        "-movflags frag_keyframe+empty_moov+default_base_moof",
-        "-max_muxing_queue_size 2048",
-        "-avoid_negative_ts make_zero",
-        "-reset_timestamps 1",
-      ])
+      .inputOptions(inputOptions)
+      .outputOptions(outputOptions)
       .on("start", (commandLine) => {
         logLine(`[${new Date().toISOString()}] [${requestId}] Spawned FFmpeg: ${commandLine}\n`);
       })

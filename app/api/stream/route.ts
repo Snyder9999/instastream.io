@@ -5,6 +5,7 @@ import {
   MediaValidationError,
   normalizeMediaUrl,
 } from "@/utils/mediaUrl";
+import { fetchUpstreamWithRedirects } from "@/utils/upstreamFetch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -75,15 +76,10 @@ export async function GET(req: NextRequest) {
     req.signal.addEventListener("abort", onAbort, { once: true });
 
     try {
-      const upstreamHeaders: Record<string, string> = {};
-      if (range) {
-        upstreamHeaders.Range = range;
-      }
-
-      const response = await fetch(normalizedUrl, {
-        headers: upstreamHeaders,
+      const response = await fetchUpstreamWithRedirects(normalizedUrl, {
+        method: "GET",
+        range,
         cache: "no-store",
-        redirect: "follow",
         signal: controller.signal,
       });
 

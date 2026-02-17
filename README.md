@@ -44,7 +44,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - `GET /api/transcode` now has:
   - Input preflight validation
   - Request-scoped FFmpeg cleanup on abort/close/error
-  - Optional concurrency cap via `MAX_ACTIVE_TRANSCODES` (default `2`)
+  - Optional concurrency cap via `MAX_ACTIVE_TRANSCODES` (default `4`)
 
 ## Production Deployment Warning
 

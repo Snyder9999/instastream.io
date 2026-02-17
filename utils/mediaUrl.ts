@@ -1,3 +1,5 @@
+import { fetchUpstreamWithRedirects } from "@/utils/upstreamFetch";
+
 const WRAPPER_HOSTS = new Set(["video-seed.dev", "www.video-seed.dev"]);
 const DEFAULT_PROBE_TIMEOUT_MS = 10_000;
 const PROBE_RANGE = "bytes=0-1023";
@@ -178,13 +180,10 @@ export async function assertMediaLikeSource(
   const { signal, cleanup } = createTimedSignal(timeoutMs, options.signal);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchUpstreamWithRedirects(url, {
       method: "GET",
-      headers: {
-        Range: PROBE_RANGE,
-      },
+      range: PROBE_RANGE,
       cache: "no-store",
-      redirect: "follow",
       signal,
     });
 
