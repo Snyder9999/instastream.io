@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Streaming Pipeline Notes
+
+- Source URL normalization now auto-unwraps known wrappers like `video-seed.dev/?url=...` before proxying or transcoding.
+- Non-media sources are rejected with `422` JSON responses:
+  - `{"code":"SOURCE_NOT_MEDIA","message":"...","sourceUrl":"...","normalizedUrl":"..."}`
+- `GET /api/stream` now preserves upstream MIME type and supports requests with or without `Range`.
+- `GET /api/transcode` now has:
+  - Input preflight validation
+  - Request-scoped FFmpeg cleanup on abort/close/error
+  - Optional concurrency cap via `MAX_ACTIVE_TRANSCODES` (default `2`)
+
+## Production Deployment Warning
+
+Long-lived FFmpeg transcoding streams are generally not a good fit for Vercel Serverless/Edge function limits. For production, run transcoding on dedicated compute (container/VM/worker service) and keep Next.js API routes as control/proxy endpoints.
