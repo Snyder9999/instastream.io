@@ -50,7 +50,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white p-4">
       <div className="max-w-2xl w-full text-center space-y-8">
-        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
+        <h1 className="text-5xl font-bold tracking-tight bg-linear-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
           InstaStream.io
         </h1>
         <p className="text-gray-400 text-lg">
@@ -71,7 +71,7 @@ export default function Home() {
           </div>
           <button
             type="submit"
-            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-xl hover:opacity-90 transition-opacity shadow-lg shadow-purple-900/20"
+            className="w-full py-4 bg-linear-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-xl hover:opacity-90 transition-opacity shadow-lg shadow-purple-900/20"
           >
             Start Streaming
           </button>

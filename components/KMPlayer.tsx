@@ -730,7 +730,7 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 className={`absolute top-0 left-0 right-0 z-20 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
                     }`}
             >
-                <div className="bg-gradient-to-b from-black/80 via-black/40 to-transparent px-6 py-4">
+                <div className="bg-linear-to-b from-black/80 via-black/40 to-transparent px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div>
                             <p className="text-white/60 text-xs uppercase tracking-wider">Now Playing</p>

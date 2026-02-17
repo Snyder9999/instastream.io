@@ -166,7 +166,7 @@ const Controls: React.FC<ControlsProps> = ({
             role="toolbar"
         >
             {/* Gradient backdrop */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
 
             <div className="relative px-4 pb-3 pt-16">
                 {/* ─── Progress Bar ─── */}
@@ -230,8 +230,8 @@ const Controls: React.FC<ControlsProps> = ({
                     {/* Scrub handle (red dot) */}
                     <div
                         className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-[#E50914] shadow-lg transition-all duration-200 ${isHoveringProgress || isScrubbing
-                                ? 'w-[14px] h-[14px] opacity-100'
-                                : 'w-0 h-0 opacity-0'
+                            ? 'w-[14px] h-[14px] opacity-100'
+                            : 'w-0 h-0 opacity-0'
                             }`}
                         style={{ left: `${progressPercent}%` }}
                     />
@@ -285,8 +285,8 @@ const Controls: React.FC<ControlsProps> = ({
                             {/* Vertical volume slider popup */}
                             <div
                                 className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/90 rounded-lg p-2 transition-all duration-300 ${showVolumeSlider
-                                        ? 'opacity-100 translate-y-0 pointer-events-auto'
-                                        : 'opacity-0 translate-y-2 pointer-events-none'
+                                    ? 'opacity-100 translate-y-0 pointer-events-auto'
+                                    : 'opacity-0 translate-y-2 pointer-events-none'
                                     }`}
                             >
                                 <div className="h-24 flex flex-col items-center justify-end">
@@ -408,8 +408,8 @@ const Controls: React.FC<ControlsProps> = ({
                                                     setShowAudioMenu(false);
                                                 }}
                                                 className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${selectedAudioIndex === track.index
-                                                        ? 'text-[#E50914] font-semibold'
-                                                        : 'text-white/80'
+                                                    ? 'text-[#E50914] font-semibold'
+                                                    : 'text-white/80'
                                                     }`}
                                             >
                                                 {track.label || track.language || `Track ${track.index}`}
