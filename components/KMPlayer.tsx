@@ -625,10 +625,10 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
             handledErrorModeRef.current = mode;
 
             const err = video.error;
-            console.error('Video Error Details:', {
+            console.warn('Video Error Details:', {
                 mode,
-                code: err?.code,
-                message: err?.message,
+                code: err?.code ?? 'unknown',
+                message: err?.message ?? 'unknown',
                 original: err,
             });
 
