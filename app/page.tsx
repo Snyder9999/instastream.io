@@ -42,7 +42,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-950 text-white p-4">
       <div className="max-w-2xl w-full text-center space-y-8">
         <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-          StreamFlow
+          IntaStream.io
         </h1>
         <p className="text-gray-400 text-lg">
           Instantly stream large videos from direct URLs using our smart chunking proxy.

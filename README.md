@@ -1,6 +1,7 @@
-# InstaStream.io
+# IntaStream.io
 
 A web-based video streaming application that lets you instantly stream large video files from direct URLs — no downloads required. Paste a video URL, hit **Stream**, and watch it play in a custom KMPlayer-inspired interface with keyboard shortcuts, subtitle support, and automatic format transcoding.
+
 
 ## Features
 
