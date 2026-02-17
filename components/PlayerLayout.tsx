@@ -6,8 +6,8 @@ interface PlayerLayoutProps {
 
 const PlayerLayout: React.FC<PlayerLayoutProps> = ({ children }) => {
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
-            <div className="w-full max-w-6xl aspect-video bg-gray-900 shadow-2xl relative group">
+        <div className="fixed inset-0 bg-black">
+            <div className="w-full h-full">
                 {children}
             </div>
         </div>

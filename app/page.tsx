@@ -28,9 +28,18 @@ export default function Home() {
         <div className="absolute top-4 left-4 z-50">
           <button
             onClick={handleBack}
-            className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors opacity-50 hover:opacity-100"
+            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors group"
+            aria-label="Back to home"
           >
-            ← Back
+            <svg
+              className="w-6 h-6 transform group-hover:-translate-x-0.5 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">Back</span>
           </button>
         </div>
         <KMPlayer key={streamUrl} srcUrl={streamUrl} />
@@ -39,10 +48,10 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-950 text-white p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white p-4">
       <div className="max-w-2xl w-full text-center space-y-8">
         <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-          IntaStream.io
+          InstaStream.io
         </h1>
         <p className="text-gray-400 text-lg">
           Instantly stream large videos from direct URLs using our smart chunking proxy.

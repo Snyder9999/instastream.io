@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Play, Pause } from 'lucide-react';
 import Controls, { AudioTrack } from './Controls';
 import usePlayerShortcuts from '../hooks/usePlayerShortcuts';
 import { VideoBufferManager } from '../utils/mseBufferLogic';
@@ -125,6 +126,13 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     // Subtitle state
     const [subtitleUrl, setSubtitleUrl] = useState<string>('');
     const [showSubtitleInput, setShowSubtitleInput] = useState(false);
+
+    // Netflix UI state
+    const [brightness, setBrightness] = useState(1);
+    const [contrast, setContrast] = useState(1);
+    const [showPlayOverlay, setShowPlayOverlay] = useState(false);
+    const playOverlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [bufferedEnd, setBufferedEnd] = useState(0);
 
     // Fetch media info on load to populate audio tracks
     useEffect(() => {
@@ -333,6 +341,11 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
         const video = videoRef.current;
         if (!video) return;
 
+        // Trigger play/pause overlay animation
+        if (playOverlayTimeoutRef.current) clearTimeout(playOverlayTimeoutRef.current);
+        setShowPlayOverlay(true);
+        playOverlayTimeoutRef.current = setTimeout(() => setShowPlayOverlay(false), 600);
+
         if (video.paused) {
             video.play().catch(() => undefined);
         } else {
@@ -411,6 +424,29 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
         document.exitFullscreen().catch(() => undefined);
     }, []);
 
+    const adjustBrightness = useCallback((delta: number) => {
+        setBrightness(prev => Math.max(0.2, Math.min(2, +(prev + delta).toFixed(2))));
+    }, []);
+
+    const adjustContrast = useCallback((delta: number) => {
+        setContrast(prev => Math.max(0.2, Math.min(2, +(prev + delta).toFixed(2))));
+    }, []);
+
+    // Track buffered end for progress bar
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const onProgress = () => {
+            if (video.buffered.length > 0) {
+                const end = video.buffered.end(video.buffered.length - 1);
+                const absolute = mode === 'transcode' ? transcodeStartTime + end : end;
+                setBufferedEnd(absolute);
+            }
+        };
+        video.addEventListener('progress', onProgress);
+        return () => video.removeEventListener('progress', onProgress);
+    }, [mode, transcodeStartTime]);
+
     usePlayerShortcuts({
         isPlaying,
         togglePlay,
@@ -418,6 +454,8 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
         volumeRelative,
         toggleFullscreen,
         toggleMute,
+        adjustBrightness,
+        adjustContrast,
     });
 
     const handleMouseMove = useCallback(() => {
@@ -639,6 +677,18 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
         };
     }, [clearStallRecoveryTimer]);
 
+    // Extract filename from URL for display
+    const displayTitle = useMemo(() => {
+        try {
+            const url = new URL(srcUrl);
+            const path = url.pathname;
+            const filename = path.split('/').pop() || '';
+            return decodeURIComponent(filename).replace(/\.[^.]+$/, '') || 'Untitled';
+        } catch {
+            return 'Untitled';
+        }
+    }, [srcUrl]);
+
     if (!srcUrl) {
         return <div className="flex items-center justify-center h-full text-gray-500">No Video Source</div>;
     }
@@ -646,14 +696,19 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     return (
         <div
             ref={containerRef}
-            className="relative w-full h-full bg-black group overflow-hidden"
+            className={`relative w-full h-full bg-black overflow-hidden select-none ${!showControls && isPlaying ? 'cursor-none' : 'cursor-default'
+                }`}
             onMouseMove={handleMouseMove}
             onMouseLeave={() => isPlaying && setShowControls(false)}
         >
+            {/* Video element with brightness/contrast CSS filter */}
             <video
                 key={`${mode}:${finalUrl ?? 'none'}`}
                 ref={videoRef}
-                className="w-full h-full object-contain cursor-pointer"
+                className="w-full h-full object-contain"
+                style={{
+                    filter: `brightness(${brightness}) contrast(${contrast})`,
+                }}
                 onClick={togglePlay}
                 autoPlay
                 playsInline
@@ -671,12 +726,63 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 Your browser does not support the video tag.
             </video>
 
+            {/* ─── Top gradient bar with title ─── */}
+            <div
+                className={`absolute top-0 left-0 right-0 z-20 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                    }`}
+            >
+                <div className="bg-gradient-to-b from-black/80 via-black/40 to-transparent px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div>
+                            <p className="text-white/60 text-xs uppercase tracking-wider">Now Playing</p>
+                            <h2 className="text-white text-lg font-semibold truncate max-w-md">
+                                {displayTitle}
+                            </h2>
+                        </div>
+                    </div>
+                    {/* Mode badges */}
+                    <div className="flex gap-2 mt-2">
+                        {mode === 'proxy' && (
+                            <span className="bg-yellow-600/80 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-medium">
+                                Proxy
+                            </span>
+                        )}
+                        {mode === 'transcode' && (
+                            <span className="bg-[#E50914]/80 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-medium">
+                                Transcoding
+                            </span>
+                        )}
+                        {isSeeking && (
+                            <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-medium">
+                                Seeking
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── Center play/pause overlay (animated flash) ─── */}
+            <div
+                className={`absolute inset-0 flex items-center justify-center pointer-events-none z-10 transition-opacity duration-300 ${showPlayOverlay ? 'opacity-100' : 'opacity-0'
+                    }`}
+            >
+                <div className={`bg-black/50 rounded-full p-5 ${showPlayOverlay ? 'netflix-play-overlay' : ''}`}>
+                    {isPlaying ? (
+                        <Play size={48} className="text-white" fill="white" />
+                    ) : (
+                        <Pause size={48} className="text-white" fill="white" />
+                    )}
+                </div>
+            </div>
+
+            {/* ─── Controls ─── */}
             <Controls
                 isPlaying={isPlaying}
                 onPlayPause={togglePlay}
                 currentTime={currentTime}
                 duration={duration}
                 onSeek={handleSeek}
+                onSeekRelative={seekRelative}
                 volume={volume}
                 onVolumeChange={handleVolume}
                 isFullscreen={isFullscreen}
@@ -688,55 +794,42 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 selectedAudioIndex={selectedAudioIndex}
                 onAudioTrackChange={(index) => {
                     setSelectedAudioIndex(index);
-                    // Force reload if in transcode mode by bumping revision or just letting dependency update
-                    // Dependency update on finalUrl -> useEffect -> MSE reload
                     if (mode === 'transcode') {
                         setTranscodeRevision(prev => prev + 1);
                         setStatusMessage('Switching audio track...');
                     }
                 }}
+                brightness={brightness}
+                contrast={contrast}
+                onBrightnessChange={setBrightness}
+                onContrastChange={setContrast}
+                bufferedEnd={bufferedEnd}
             />
 
-            {mode === 'proxy' && (
-                <div className="absolute top-2 right-2 bg-yellow-600 text-white text-xs px-2 py-1 rounded opacity-90 pointer-events-none z-10">
-                    Proxy Fallback
-                </div>
-            )}
-
-            {mode === 'transcode' && (
-                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-90 pointer-events-none z-10">
-                    Transcoding Live
-                </div>
-            )}
-
-            {isSeeking && (
-                <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded opacity-90 pointer-events-none z-10">
-                    Seeking...
-                </div>
-            )}
-
+            {/* ─── Subtitle input modal ─── */}
             {showSubtitleInput && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
-                    <form onSubmit={handleSubtitleSubmit} className="bg-gray-900 p-6 rounded-xl border border-gray-700 space-y-4 w-96">
-                        <h3 className="text-white font-semibold">Load Subtitles (SRT/VTT)</h3>
+                <div className="absolute inset-0 bg-black/85 flex items-center justify-center z-40 backdrop-blur-sm">
+                    <form onSubmit={handleSubtitleSubmit} className="bg-[#141414] p-6 rounded-xl border border-white/10 space-y-4 w-96 shadow-2xl">
+                        <h3 className="text-white font-semibold text-lg">Load Subtitles</h3>
+                        <p className="text-white/50 text-sm">Enter a direct URL to an SRT or VTT subtitle file.</p>
                         <input
                             name="subtitleUrl"
                             type="url"
                             placeholder="https://example.com/subs.srt"
-                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E50914] focus:border-transparent outline-none placeholder-white/30 transition-all"
                             autoFocus
                         />
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-3 pt-2">
                             <button
                                 type="button"
                                 onClick={() => setShowSubtitleInput(false)}
-                                className="px-3 py-1 text-gray-400 hover:text-white"
+                                className="px-4 py-2 text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500"
+                                className="px-5 py-2 bg-[#E50914] text-white rounded-lg hover:bg-[#f6121d] transition-colors font-medium"
                             >
                                 Load
                             </button>
@@ -745,15 +838,25 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
                 </div>
             )}
 
+            {/* ─── Status message ─── */}
             {statusMessage && (
-                <div className="absolute bottom-2 left-2 right-2 bg-gray-900/90 text-gray-100 text-xs px-3 py-2 rounded pointer-events-none z-10">
-                    {statusMessage}
+                <div className="absolute bottom-16 left-4 right-4 z-20 transition-opacity duration-500">
+                    <div className="bg-black/80 backdrop-blur-sm text-white/90 text-xs px-4 py-2.5 rounded-lg pointer-events-none inline-block">
+                        {statusMessage}
+                    </div>
                 </div>
             )}
 
+            {/* ─── Failed state overlay ─── */}
             {mode === 'failed' && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center px-6 text-center text-sm text-red-300 z-10">
-                    Playback failed after trying direct, proxy, and transcoding modes.
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center px-6 text-center z-40">
+                    <div className="bg-[#141414] rounded-xl p-8 max-w-md border border-white/10">
+                        <div className="text-[#E50914] text-4xl mb-4">⚠</div>
+                        <h3 className="text-white text-lg font-semibold mb-2">Playback Failed</h3>
+                        <p className="text-white/50 text-sm">
+                            Unable to play this video after trying direct, proxy, and transcoding modes.
+                        </p>
+                    </div>
                 </div>
             )}
         </div>
