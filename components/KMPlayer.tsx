@@ -93,6 +93,8 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastMouseMoveTimeRef = useRef(0);
+    const isPlayingRef = useRef(false);
     const handledErrorModeRef = useRef<PlaybackMode | null>(null);
     const seekDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const stallRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,6 +107,10 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
 
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
+
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+    }, [isPlaying]);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(1);
@@ -473,16 +479,24 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
 
     const handleMouseMove = useCallback(() => {
         setShowControls(true);
-        if (controlsTimeoutRef.current) {
-            clearTimeout(controlsTimeoutRef.current);
-        }
+        lastMouseMoveTimeRef.current = Date.now();
 
-        controlsTimeoutRef.current = setTimeout(() => {
-            if (isPlaying) {
-                setShowControls(false);
+        if (controlsTimeoutRef.current) return;
+
+        const checkInactivity = () => {
+            const timeSinceLastMove = Date.now() - lastMouseMoveTimeRef.current;
+            if (timeSinceLastMove >= 3000) {
+                if (isPlayingRef.current) {
+                    setShowControls(false);
+                }
+                controlsTimeoutRef.current = null;
+            } else {
+                controlsTimeoutRef.current = setTimeout(checkInactivity, 3000 - timeSinceLastMove);
             }
-        }, 3000);
-    }, [isPlaying]);
+        };
+
+        controlsTimeoutRef.current = setTimeout(checkInactivity, 3000);
+    }, []);
 
     const advanceMode = useCallback(async (currentMode: Exclude<PlaybackMode, 'failed'>) => {
         if (currentMode === 'direct') {
