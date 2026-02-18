@@ -399,8 +399,13 @@ const KMPlayer: React.FC<KMPlayerProps> = ({ srcUrl }) => {
     }, [commitTranscodeSeek, duration, mode]);
 
     const seekRelative = useCallback((seconds: number) => {
-        handleSeek(currentTime + seconds);
-    }, [currentTime, handleSeek]);
+        const video = videoRef.current;
+        if (!video) return;
+
+        const raw = video.currentTime || 0;
+        const currentAbs = mode === 'transcode' ? transcodeStartTime + raw : raw;
+        handleSeek(currentAbs + seconds);
+    }, [handleSeek, mode, transcodeStartTime]);
 
     const handleVolume = useCallback((vol: number) => {
         const video = videoRef.current;
