@@ -54,6 +54,8 @@ export function buildUpstreamHeaders(
   return headers;
 }
 
+import { validateUrl } from "@/utils/urlSecurity";
+
 export interface FetchUpstreamWithRedirectsOptions {
   method?: "GET" | "HEAD";
   range?: string | null;
@@ -69,6 +71,8 @@ export async function fetchUpstreamWithRedirects(
   if (!isHttpUrl(sourceUrl)) {
     throw new Error("Only HTTP(S) upstream URLs are supported.");
   }
+
+  await validateUrl(sourceUrl);
 
   const method = options.method ?? "GET";
   const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
@@ -109,6 +113,8 @@ export async function fetchUpstreamWithRedirects(
       response.body?.cancel().catch(() => undefined);
       throw new Error("Upstream redirect uses an unsupported protocol.");
     }
+
+    await validateUrl(nextUrl);
 
     response.body?.cancel().catch(() => undefined);
     currentUrl = nextUrl;
