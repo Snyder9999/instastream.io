@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import { DEFAULT_UPSTREAM_USER_AGENT } from './upstreamFetch';
 
 export interface MediaTrack {
     index: number;
@@ -16,7 +17,15 @@ export interface MediaProbeResult {
 
 export function probeMedia(url: string): Promise<MediaProbeResult> {
     return new Promise((resolve, reject) => {
-        ffmpeg.ffprobe(url, (err, metadata) => {
+        // We use an options array to set security parameters for ffprobe.
+        const options = [
+            '-protocol_whitelist', 'http,https,tcp,tls',
+            '-user_agent', DEFAULT_UPSTREAM_USER_AGENT,
+        ];
+
+        // We pass undefined as the second argument (stream index) to ensure
+        // options is correctly identified as the third argument.
+        ffmpeg.ffprobe(url, undefined, options, (err, metadata) => {
             if (err) {
                 reject(err);
                 return;

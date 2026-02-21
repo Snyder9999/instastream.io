@@ -163,6 +163,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const inputOptions = [
+      "-protocol_whitelist",
+      "http,https,tcp,tls",
       "-ss",
       startTime,
       "-user_agent",
