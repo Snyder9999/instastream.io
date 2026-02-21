@@ -25,39 +25,45 @@ export async function GET(req: NextRequest) {
     let video = db.prepare('SELECT * FROM videos WHERE url = ?').get(url) as VideoRecord | undefined;
 
     // 2. If completely downloaded, serve from disk
-    if (video && video.status === 'completed' && StorageManager.fileExists(video.filename)) {
+    if (video && video.status === 'completed') {
         const filePath = StorageManager.getFilePath(video.filename);
-        const stat = fs.statSync(filePath);
-        const fileSize = stat.size;
-        const range = req.headers.get('range');
+        try {
+            const stat = await fs.promises.stat(filePath);
+            const fileSize = stat.size;
+            const range = req.headers.get('range');
 
-        if (range) {
-            const parts = range.replace(/bytes=/, "").split("-");
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-            const chunksize = (end - start) + 1;
-            const file = fs.createReadStream(filePath, { start, end });
+            if (range) {
+                const parts = range.replace(/bytes=/, "").split("-");
+                const start = parseInt(parts[0], 10);
+                const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+                const chunksize = (end - start) + 1;
+                const file = fs.createReadStream(filePath, { start, end });
 
-            // @ts-expect-error - ReadableStream type mismatch
-            return new NextResponse(file, {
-                status: 206,
-                headers: {
-                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': chunksize.toString(),
-                    'Content-Type': 'video/mp4',
-                },
-            });
-        } else {
-            const file = fs.createReadStream(filePath);
-            // @ts-expect-error - ReadableStream type mismatch
-            return new NextResponse(file, {
-                status: 200,
-                headers: {
-                    'Content-Length': fileSize.toString(),
-                    'Content-Type': 'video/mp4',
-                },
-            });
+                // @ts-expect-error - ReadableStream type mismatch
+                return new NextResponse(file, {
+                    status: 206,
+                    headers: {
+                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': chunksize.toString(),
+                        'Content-Type': 'video/mp4',
+                    },
+                });
+            } else {
+                const file = fs.createReadStream(filePath);
+                // @ts-expect-error - ReadableStream type mismatch
+                return new NextResponse(file, {
+                    status: 200,
+                    headers: {
+                        'Content-Length': fileSize.toString(),
+                        'Content-Type': 'video/mp4',
+                    },
+                });
+            }
+        } catch (e) {
+            // File not found or other error, fall back to download logic
+            // We could log this mismatch between DB and FS
+            console.warn(`File expected but not found/accessible: ${filePath}`, e);
         }
     }
 
