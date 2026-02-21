@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { probeMedia, MediaProbeResult } from '@/utils/mediaProbe';
-import { normalizeMediaUrl } from '@/utils/mediaUrl';
+import { normalizeMediaUrl, assertMediaLikeSource, MediaValidationError } from '@/utils/mediaUrl';
 import { SimpleLRUCache } from '@/utils/lruCache';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
         let metadata = probeCache.get(normalizedUrl);
 
         if (!metadata) {
+            // Assert that the source is actually media before probing.
+            // This also performs SSRF and LFI validation.
+            await assertMediaLikeSource(normalizedUrl, { signal: req.signal });
+
             metadata = await probeMedia(normalizedUrl);
             probeCache.set(normalizedUrl, metadata);
         }
@@ -34,6 +38,9 @@ export async function GET(req: NextRequest) {
             allTracks: metadata.tracks
         });
     } catch (error: unknown) {
+        if (error instanceof MediaValidationError) {
+            return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+        }
         console.error('Probe error:', error);
         return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Failed to probe media' },

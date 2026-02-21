@@ -138,6 +138,13 @@ export function normalizeMediaUrl(raw: string): NormalizeMediaUrlResult {
 
   const host = outer.hostname.toLowerCase();
   if (!WRAPPER_HOSTS.has(host)) {
+    if (outer.protocol !== "http:" && outer.protocol !== "https:") {
+      throw new MediaValidationError(
+        "INVALID_URL",
+        "Only HTTP and HTTPS protocols are supported.",
+        400,
+      );
+    }
     return {
       normalizedUrl: outer.toString(),
       wasWrapped: false,
@@ -161,6 +168,14 @@ export function normalizeMediaUrl(raw: string): NormalizeMediaUrlResult {
     throw new MediaValidationError(
       "INVALID_URL",
       "The wrapper \"url\" parameter is not a valid absolute URL.",
+      400,
+    );
+  }
+
+  if (inner.protocol !== "http:" && inner.protocol !== "https:") {
+    throw new MediaValidationError(
+      "INVALID_URL",
+      "Only HTTP and HTTPS protocols are supported for the wrapped URL.",
       400,
     );
   }

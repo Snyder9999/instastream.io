@@ -1,3 +1,6 @@
+const MAX_QUEUE_SIZE = 50;
+const BACKPRESSURE_POLL_INTERVAL = 50;
+
 export class VideoBufferManager {
     private mediaSource: MediaSource;
     private sourceBuffer: SourceBuffer | null = null;
@@ -204,6 +207,13 @@ export class VideoBufferManager {
             const reader = response.body.getReader();
 
             while (true) {
+                // Backpressure: pause reading if queue is too large
+                while (this.queue.length > MAX_QUEUE_SIZE) {
+                    if (signal.aborted) break;
+                    await new Promise((resolve) => setTimeout(resolve, BACKPRESSURE_POLL_INTERVAL));
+                }
+                if (signal.aborted) break;
+
                 const { done, value } = await reader.read();
                 if (done) {
                     this.endOfStream();

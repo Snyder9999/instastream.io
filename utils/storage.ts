@@ -16,7 +16,15 @@ export class StorageManager {
 
     static generateFilename(url: string): string {
         const hash = crypto.createHash('md5').update(url).digest('hex');
-        const ext = path.extname(url).split('?')[0] || '.mp4';
+        let ext = path.extname(url).split('?')[0].toLowerCase();
+
+        // Whitelist of allowed video extensions
+        const allowedExtensions = ['.mp4', '.webm', '.mkv', '.mov', '.avi', '.m4v', '.flv'];
+
+        if (!allowedExtensions.includes(ext)) {
+            ext = '.mp4';
+        }
+
         return `${hash}${ext}`;
     }
 
