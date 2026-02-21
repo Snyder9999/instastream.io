@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { srtToVtt } from "./srtToVtt";
+import { srtToVtt } from "@/utils/srtToVtt";
 
 describe("srtToVtt", () => {
   test("converts basic SRT to VTT correctly", () => {
