@@ -10,8 +10,10 @@ import {
   MediaValidationError,
   normalizeMediaUrl,
 } from "@/utils/mediaUrl";
+import { redactSensitiveInfo } from "@/utils/sensitiveData";
 import { buildUpstreamReferer, DEFAULT_UPSTREAM_USER_AGENT } from "@/utils/upstreamFetch";
 import { parseStartTime } from "@/utils/time";
+import { isValidStreamIndex } from "@/utils/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,6 +51,22 @@ export async function GET(req: NextRequest) {
   // Audio and Subtitle indices are global stream indices (from ffprobe)
   const audioIndex = req.nextUrl.searchParams.get("audioIndex");
   const subtitleIndex = req.nextUrl.searchParams.get("subtitleIndex");
+
+  if (audioIndex !== null && !isValidStreamIndex(audioIndex)) {
+    return jsonError(400, {
+      code: "INVALID_STREAM_INDEX",
+      message: "Stream index must be a non-negative integer.",
+      sourceUrl: sourceUrl ?? undefined,
+    });
+  }
+
+  if (subtitleIndex !== null && !isValidStreamIndex(subtitleIndex)) {
+    return jsonError(400, {
+      code: "INVALID_STREAM_INDEX",
+      message: "Stream index must be a non-negative integer.",
+      sourceUrl: sourceUrl ?? undefined,
+    });
+  }
 
   if (!sourceUrl) {
     return jsonError(400, {
@@ -165,6 +183,8 @@ export async function GET(req: NextRequest) {
       "15000000",
       "-fflags",
       "+genpts+discardcorrupt",
+      "-protocol_whitelist",
+      "http,https,tcp,tls,crypto",
     ];
 
     if (upstreamReferer) {
@@ -206,10 +226,14 @@ export async function GET(req: NextRequest) {
       .inputOptions(inputOptions)
       .outputOptions(outputOptions)
       .on("start", (commandLine) => {
-        logLine(`[${new Date().toISOString()}] [${requestId}] Spawned FFmpeg: ${commandLine}\n`);
+        logLine(
+          `[${new Date().toISOString()}] [${requestId}] Spawned FFmpeg: ${redactSensitiveInfo(commandLine)}\n`,
+        );
       })
       .on("stderr", (stderrLine) => {
-        logLine(`[${new Date().toISOString()}] [${requestId}] [Stderr] ${stderrLine}\n`);
+        logLine(
+          `[${new Date().toISOString()}] [${requestId}] [Stderr] ${redactSensitiveInfo(stderrLine)}\n`,
+        );
       })
       .on("error", (err) => {
         logLine(
