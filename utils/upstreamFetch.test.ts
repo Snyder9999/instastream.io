@@ -10,7 +10,7 @@ mock.module("node:dns/promises", () => ({
     if (hostname === "redirect-to-private.com") return [{ address: "93.184.216.34", family: 4 }];
     if (hostname === "redirect-loop.com") return [{ address: "93.184.216.34", family: 4 }];
 
-    // Domains from master's tests
+    // Domains from master's tests (assume public)
     if (["source.com", "dest.com", "mid.com", "next.com"].includes(hostname)) {
       return [{ address: "8.8.8.8", family: 4 }]; // Public IP
     }

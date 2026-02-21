@@ -1,3 +1,5 @@
+import { validateUrl } from "@/utils/urlSecurity";
+
 const DEFAULT_MAX_REDIRECTS = 5;
 
 export const DEFAULT_UPSTREAM_USER_AGENT =
@@ -53,8 +55,6 @@ export function buildUpstreamHeaders(
 
   return headers;
 }
-
-import { validateUrl } from "@/utils/urlSecurity";
 
 export interface FetchUpstreamWithRedirectsOptions {
   method?: "GET" | "HEAD";

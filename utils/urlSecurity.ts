@@ -127,10 +127,8 @@ export function isPrivateIp(ip: string): boolean {
   return false;
 }
 
-// Kept for backward compatibility if needed, but implementation updated to use robust checks
-export function isPrivateIP(ip: string): boolean {
-  return isPrivateIp(ip);
-}
+// Compatibility alias for master branch if needed
+export const isPrivateIP = isPrivateIp;
 
 export async function validateUrl(url: string): Promise<void> {
   let parsed: URL;
@@ -177,10 +175,14 @@ export async function validateUrl(url: string): Promise<void> {
   }
 }
 
-// Kept for backward compatibility
-export async function isSafeUrl(url: string): Promise<boolean> {
+/**
+ * Validates if a URL is safe to fetch from a server context.
+ * Returns true if safe, false otherwise.
+ * Compatibility wrapper for master branch usage.
+ */
+export async function isSafeUrl(urlStr: string): Promise<boolean> {
   try {
-    await validateUrl(url);
+    await validateUrl(urlStr);
     return true;
   } catch {
     return false;
