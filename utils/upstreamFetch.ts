@@ -1,3 +1,5 @@
+import { isSafeUrl } from "@/utils/urlSecurity";
+
 const DEFAULT_MAX_REDIRECTS = 5;
 
 export const DEFAULT_UPSTREAM_USER_AGENT =
@@ -66,8 +68,8 @@ export async function fetchUpstreamWithRedirects(
   sourceUrl: string,
   options: FetchUpstreamWithRedirectsOptions = {},
 ): Promise<Response> {
-  if (!isHttpUrl(sourceUrl)) {
-    throw new Error("Only HTTP(S) upstream URLs are supported.");
+  if (!(await isSafeUrl(sourceUrl))) {
+    throw new Error("Only public HTTP(S) upstream URLs are supported.");
   }
 
   const method = options.method ?? "GET";
@@ -105,9 +107,9 @@ export async function fetchUpstreamWithRedirects(
       throw new Error("Upstream redirect location is invalid.");
     }
 
-    if (!isHttpUrl(nextUrl)) {
+    if (!(await isSafeUrl(nextUrl))) {
       response.body?.cancel().catch(() => undefined);
-      throw new Error("Upstream redirect uses an unsupported protocol.");
+      throw new Error("Upstream redirect location is unsafe or unsupported.");
     }
 
     response.body?.cancel().catch(() => undefined);
