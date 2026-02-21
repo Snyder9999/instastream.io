@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import db, { VideoRecord } from '@/db';
 import { StorageManager } from '@/utils/storage';
+import { fetchUpstreamWithRedirects } from '@/utils/upstreamFetch';
 import { PassThrough } from 'stream';
 
 // Helper to update DB status
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const upstreamRes = await fetch(url);
+        const upstreamRes = await fetchUpstreamWithRedirects(url);
         if (!upstreamRes.ok || !upstreamRes.body) {
             db.prepare('UPDATE videos SET status = ? WHERE id = ?').run('error', video.id);
             return new NextResponse('Upstream Error', { status: upstreamRes.status });
