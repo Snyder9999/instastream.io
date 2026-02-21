@@ -19,15 +19,15 @@ export async function GET(req: NextRequest) {
         return new NextResponse('Missing URL', { status: 400 });
     }
 
-    StorageManager.ensureDirectory();
+    await StorageManager.ensureDirectory();
 
     // 1. Check DB for existing record
     let video = db.prepare('SELECT * FROM videos WHERE url = ?').get(url) as VideoRecord | undefined;
 
     // 2. If completely downloaded, serve from disk
-    if (video && video.status === 'completed' && StorageManager.fileExists(video.filename)) {
+    if (video && video.status === 'completed' && await StorageManager.fileExists(video.filename)) {
         const filePath = StorageManager.getFilePath(video.filename);
-        const stat = fs.statSync(filePath);
+        const stat = await fs.promises.stat(filePath);
         const fileSize = stat.size;
         const range = req.headers.get('range');
 
