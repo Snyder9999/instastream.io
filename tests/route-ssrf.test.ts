@@ -20,7 +20,11 @@ mock.module("@/utils/storage", () => {
             ensureDirectory: () => {},
             generateFilename: (url: string) => "mock-file.mp4",
             getFilePath: (filename: string) => `/tmp/${filename}`,
-            fileExists: () => false,
+            fileExists: () => Promise.resolve(false), // Updated to match async signature in upstream if changed?
+            // Upstream code uses `await StorageManager.fileExists` now?
+            // Let's check upstream code again.
+            // app/api/download-stream/route.ts:27: if (video ... && await StorageManager.fileExists(video.filename))
+            // Yes, it awaits it.
         }
     }
 });
@@ -44,6 +48,8 @@ describe("SSRF Vulnerability Reproduction", () => {
 
   beforeAll(async () => {
     // Dynamic import to allow mocks to take effect
+    // We need to re-import or use `require` to get a fresh module if it was cached?
+    // In bun test, imports are cached. But this is a new test file run.
     const mod = await import("../app/api/download-stream/route");
     GET = mod.GET;
 
@@ -90,7 +96,15 @@ describe("SSRF Vulnerability Reproduction", () => {
     console.log("Status:", res.status);
     console.log("Body:", text);
 
-    expect(res.status).not.toBe(200);
-    expect(text).not.toContain("Secret Internal Data");
+    // Expectation: Blocking SSRF
+    // It should fail with 500 (Internal Error) because the upstream fetch throws an error caught in the route handler.
+    // Or it might return "Upstream Error" if status is not ok?
+    // In fetchUpstreamWithRedirects, it throws Error if validation fails.
+    // The route handler catches it:
+    // catch (e) { console.error('Download Setup Error:', e); return new NextResponse('Internal Error', { status: 500 }); }
+
+    expect(res.status).toBe(500);
+    expect(text).toContain("Internal Error");
+    // Optionally check logs or specific error message if exposed, but "Internal Error" is what the client sees.
   });
 });
