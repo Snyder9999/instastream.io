@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { probeMedia } from '@/utils/mediaProbe';
+import { probeMedia, MediaProbeResult } from '@/utils/mediaProbe';
 import { normalizeMediaUrl } from '@/utils/mediaUrl';
+import { SimpleLRUCache } from '@/utils/lruCache';
 
 export const dynamic = 'force-dynamic';
+
+const PROBE_CACHE_CAPACITY = 100;
+const probeCache = new SimpleLRUCache<string, MediaProbeResult>(PROBE_CACHE_CAPACITY);
 
 export async function GET(req: NextRequest) {
     const url = req.nextUrl.searchParams.get('url');
@@ -13,7 +17,13 @@ export async function GET(req: NextRequest) {
 
     try {
         const { normalizedUrl } = normalizeMediaUrl(url);
-        const metadata = await probeMedia(normalizedUrl);
+
+        let metadata = probeCache.get(normalizedUrl);
+
+        if (!metadata) {
+            metadata = await probeMedia(normalizedUrl);
+            probeCache.set(normalizedUrl, metadata);
+        }
 
         // Filter for audio tracks specifically for the frontend selector
         const audioTracks = metadata.tracks.filter(t => t.type === 'audio');
