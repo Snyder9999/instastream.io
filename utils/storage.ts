@@ -20,19 +20,26 @@ export class StorageManager {
         return `${hash}${ext}`;
     }
 
-    static ensureDirectory() {
-        if (!fs.existsSync(DOWNLOAD_DIR)) {
-            fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+    static async ensureDirectory(): Promise<void> {
+        try {
+            await fs.promises.access(DOWNLOAD_DIR);
+        } catch {
+            await fs.promises.mkdir(DOWNLOAD_DIR, { recursive: true });
         }
     }
 
-    static fileExists(filename: string): boolean {
-        return fs.existsSync(this.getFilePath(filename));
+    static async fileExists(filename: string): Promise<boolean> {
+        try {
+            await fs.promises.access(this.getFilePath(filename));
+            return true;
+        } catch {
+            return false;
+        }
     }
 
-    static getFileSize(filename: string): number {
+    static async getFileSize(filename: string): Promise<number> {
         try {
-            const stats = fs.statSync(this.getFilePath(filename));
+            const stats = await fs.promises.stat(this.getFilePath(filename));
             return stats.size;
         } catch (e) {
             return 0;
