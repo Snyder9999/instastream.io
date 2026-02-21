@@ -71,9 +71,9 @@ describe("GET /api/media-info", () => {
 
   it("should handle validation errors", async () => {
     mockNormalizeMediaUrl.mockImplementationOnce(() => {
-        const err = new Error("Invalid URL") as any;
-        err.code = "INVALID_URL";
-        err.status = 400;
+        const err = new Error("Invalid URL");
+        (err as unknown as { code: string }).code = "INVALID_URL";
+        (err as unknown as { status: number }).status = 400;
         throw err;
     });
 

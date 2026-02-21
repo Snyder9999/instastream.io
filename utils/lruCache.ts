@@ -1,40 +1,41 @@
 export class SimpleLRUCache<K, V> {
-  private capacity: number;
-  private map: Map<K, V>;
+    private capacity: number;
+    private cache: Map<K, V>;
 
-  constructor(capacity: number) {
-    this.capacity = capacity;
-    this.map = new Map<K, V>();
-  }
-
-  get(key: K): V | undefined {
-    const item = this.map.get(key);
-    if (item !== undefined) {
-      // Refresh key by deleting and re-inserting
-      this.map.delete(key);
-      this.map.set(key, item);
-    }
-    return item;
-  }
-
-  set(key: K, value: V): void {
-    if (this.map.has(key)) {
-      this.map.delete(key);
-    } else if (this.map.size >= this.capacity) {
-      // Delete the oldest item (first in Map iteration)
-      const firstKey = this.map.keys().next().value;
-      if (firstKey !== undefined) {
-        this.map.delete(firstKey);
+    constructor(capacity: number) {
+      if (capacity <= 0) {
+        throw new Error("Capacity must be positive");
       }
+      this.capacity = capacity;
+      this.cache = new Map();
     }
-    this.map.set(key, value);
-  }
 
-  clear(): void {
-    this.map.clear();
-  }
+    get(key: K): V | undefined {
+      if (!this.cache.has(key)) {
+        return undefined;
+      }
+      // Refresh the key by deleting and re-setting
+      const value = this.cache.get(key)!;
+      this.cache.delete(key);
+      this.cache.set(key, value);
+      return value;
+    }
 
-  get size(): number {
-    return this.map.size;
-  }
+    set(key: K, value: V): void {
+      if (this.cache.has(key)) {
+        // Update value and refresh position
+        this.cache.delete(key);
+      } else if (this.cache.size >= this.capacity) {
+        // Evict least recently used (first item in Map)
+        const firstKey = this.cache.keys().next().value;
+        if (firstKey !== undefined) {
+          this.cache.delete(firstKey);
+        }
+      }
+      this.cache.set(key, value);
+    }
+
+    clear(): void {
+      this.cache.clear();
+    }
 }

@@ -10,6 +10,7 @@ import {
   MediaValidationError,
   normalizeMediaUrl,
 } from "@/utils/mediaUrl";
+import { redactSensitiveInfo } from "@/utils/sensitiveData";
 import { buildUpstreamReferer, DEFAULT_UPSTREAM_USER_AGENT } from "@/utils/upstreamFetch";
 import { isValidStreamIndex } from "@/utils/validation";
 
@@ -233,10 +234,14 @@ export async function GET(req: NextRequest) {
       .inputOptions(inputOptions)
       .outputOptions(outputOptions)
       .on("start", (commandLine) => {
-        logLine(`[${new Date().toISOString()}] [${requestId}] Spawned FFmpeg: ${commandLine}\n`);
+        logLine(
+          `[${new Date().toISOString()}] [${requestId}] Spawned FFmpeg: ${redactSensitiveInfo(commandLine)}\n`,
+        );
       })
       .on("stderr", (stderrLine) => {
-        logLine(`[${new Date().toISOString()}] [${requestId}] [Stderr] ${stderrLine}\n`);
+        logLine(
+          `[${new Date().toISOString()}] [${requestId}] [Stderr] ${redactSensitiveInfo(stderrLine)}\n`,
+        );
       })
       .on("error", (err) => {
         logLine(
