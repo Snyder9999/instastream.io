@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
         return new NextResponse('Missing URL', { status: 400 });
     }
 
-    StorageManager.ensureDirectory();
+    await StorageManager.ensureDirectory();
 
     // 1. Check DB for existing record
     let video = db.prepare('SELECT * FROM videos WHERE url = ?').get(url) as VideoRecord | undefined;
@@ -110,13 +110,13 @@ export async function GET(req: NextRequest) {
         // Instead, we use Node.js PassThrough if possible, or just read chunks and write to both.
 
         const fileStream = fs.createWriteStream(video.filepath);
-        const passThrough = new PassThrough();
 
         // Convert web stream to node stream to use .pipe()? 
         // Or manually read reader and write to both. Manual is safer for edge environment compat (though we are nodejs here).
 
         const reader = upstreamRes.body.getReader();
         let bytesWritten = 0;
+        let lastUpdateBytes = 0;
 
         // Create a ReadableStream for the response
         const stream = new ReadableStream({
@@ -136,8 +136,9 @@ export async function GET(req: NextRequest) {
                         bytesWritten += value.length;
 
                         // Throttle DB updates (every 1MB roughly?)
-                        if (bytesWritten % (1024 * 1024) === 0) {
+                        if (bytesWritten - lastUpdateBytes >= (1024 * 1024)) {
                             updateStatus(video!.id, 'downloading', bytesWritten);
+                            lastUpdateBytes = bytesWritten;
                         }
 
                         // 2. Send to client
