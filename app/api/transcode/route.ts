@@ -190,6 +190,8 @@ export async function GET(req: NextRequest) {
       "15000000",
       "-fflags",
       "+genpts+discardcorrupt",
+      "-protocol_whitelist",
+      "http,https,tcp,tls,crypto",
     ];
 
     if (upstreamReferer) {
