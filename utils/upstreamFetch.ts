@@ -1,3 +1,5 @@
+import { isSafeUrl } from "@/utils/urlSecurity";
+
 const DEFAULT_MAX_REDIRECTS = 5;
 
 export const DEFAULT_UPSTREAM_USER_AGENT =
@@ -75,6 +77,10 @@ export async function fetchUpstreamWithRedirects(
   let currentUrl = sourceUrl;
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    if (!(await isSafeUrl(currentUrl))) {
+      throw new Error("Upstream URL is not safe.");
+    }
+
     const response = await fetch(currentUrl, {
       method,
       headers: buildUpstreamHeaders(currentUrl, { range: options.range }),

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { srtToVtt } from '@/utils/srtToVtt';
+import { fetchUpstreamWithRedirects } from '@/utils/upstreamFetch';
 
-export const runtime = 'edge'; // Use Edge if possible for speed, or nodejs if we need it. 
-// Actually srtToVtt is pure JS, so Edge is fine. But let's stick to nodejs defaults if unsure about project config.
-// The project uses standard Next.js. srtToVtt is simple string manipulation.
+export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
     const url = req.nextUrl.searchParams.get('url');
@@ -13,7 +12,8 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const response = await fetch(url);
+        const response = await fetchUpstreamWithRedirects(url);
+
         if (!response.ok) {
             return new NextResponse(`Failed to fetch subtitles: ${response.statusText}`, { status: response.status });
         }
@@ -40,8 +40,15 @@ export async function GET(req: NextRequest) {
                 'Cache-Control': 'public, max-age=3600',
             },
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Subtitle proxy error:', error);
+        const msg = error.message || '';
+        if (msg === 'Upstream URL is not safe.' || msg.includes('Upstream URL is not safe')) {
+             return new NextResponse('Forbidden: Unsafe URL', { status: 403 });
+        }
+        if (msg.includes('Only HTTP(S) upstream URLs are supported')) {
+             return new NextResponse('Bad Request: Invalid Protocol', { status: 400 });
+        }
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
