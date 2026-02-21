@@ -112,9 +112,9 @@ export async function fetchUpstreamWithRedirects(
       throw new Error("Upstream redirect location is invalid.");
     }
 
-    if (!isHttpUrl(nextUrl)) {
+    if (!(await isSafeUrl(nextUrl))) {
       response.body?.cancel().catch(() => undefined);
-      throw new Error("Upstream redirect uses an unsupported protocol.");
+      throw new Error("Upstream redirect location is unsafe or unsupported.");
     }
 
     // Explicitly validate nextUrl here as well, although loop will catch it.
