@@ -11,6 +11,7 @@ import {
   normalizeMediaUrl,
 } from "@/utils/mediaUrl";
 import { buildUpstreamReferer, DEFAULT_UPSTREAM_USER_AGENT } from "@/utils/upstreamFetch";
+import { parseStartTime } from "@/utils/time";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,13 +41,6 @@ async function logLine(line: string) {
 
 function jsonError(status: number, body: ErrorBody) {
   return NextResponse.json(body, { status });
-}
-
-function parseStartTime(raw: string | null): string | null {
-  if (!raw || raw.trim() === "") return "0";
-  const value = Number.parseFloat(raw);
-  if (!Number.isFinite(value) || value < 0) return null;
-  return value.toString();
 }
 
 export async function GET(req: NextRequest) {
