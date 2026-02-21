@@ -127,6 +127,11 @@ export function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+// Kept for backward compatibility if needed, but implementation updated to use robust checks
+export function isPrivateIP(ip: string): boolean {
+  return isPrivateIp(ip);
+}
+
 export async function validateUrl(url: string): Promise<void> {
   let parsed: URL;
   try {
@@ -169,5 +174,15 @@ export async function validateUrl(url: string): Promise<void> {
     if (isPrivateIp(ip)) {
       throw new Error(`Resolved to private IP: ${ip}`);
     }
+  }
+}
+
+// Kept for backward compatibility
+export async function isSafeUrl(url: string): Promise<boolean> {
+  try {
+    await validateUrl(url);
+    return true;
+  } catch {
+    return false;
   }
 }
