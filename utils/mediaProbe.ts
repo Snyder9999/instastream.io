@@ -25,6 +25,7 @@ export function probeMedia(url: string): Promise<MediaProbeResult> {
 
         // We pass undefined as the second argument (stream index) to ensure
         // options is correctly identified as the third argument.
+        // @ts-expect-error: fluent-ffmpeg types incorrectly require a number for the stream index argument
         ffmpeg.ffprobe(url, undefined, options, (err, metadata) => {
             if (err) {
                 reject(err);
