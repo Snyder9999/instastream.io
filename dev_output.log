@@ -1,0 +1,45 @@
+$ next dev
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+
+✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+✓ Ready in 1098ms
+○ Compiling / ...
+ GET / 200 in 5.3s (compile: 5.0s, render: 353ms)
+ GET / 200 in 109ms (compile: 6ms, render: 103ms)
+Probe error: Error: Cannot find ffprobe
+    at ignore-listed frames
+ GET /api/media-info?url=https%3A%2F%2Fmedia.w3.org%2F2010%2F05%2Fsintel%2Ftrailer.mp4 500 in 1055ms (compile: 829ms, render: 226ms)
+Probe error: Error: Cannot find ffprobe
+    at <unknown> (utils/mediaProbe.ts:19:16)
+    at new Promise (<anonymous>)
+    at probeMedia (utils/mediaProbe.ts:18:12)
+    at GET (app/api/media-info/route.ts:16:42)
+  17 | export function probeMedia(url: string): Promise<MediaProbeResult> {
+  18 |     return new Promise((resolve, reject) => {
+> 19 |         ffmpeg.ffprobe(url, (err, metadata) => {
+     |                ^
+  20 |             if (err) {
+  21 |                 reject(err);
+  22 |                 return;
+ GET /api/media-info?url=https%3A%2F%2Fmedia.w3.org%2F2010%2F05%2Fsintel%2Ftrailer.mp4 500 in 352ms (compile: 11ms, render: 341ms)
+ GET /api/download-stream?url=https%3A%2F%2Fmedia.w3.org%2F2010%2F05%2Fsintel%2Ftrailer.mp4 200 in 947ms (compile: 657ms, render: 290ms)
+Client disconnected, stopping download.
+Stream Error: TypeError: Invalid state: Controller is already closed
+    at Object.start (app/api/download-stream/route.ts:124:40)
+  122 |                             fileStream.end();
+  123 |                             updateStatus(video!.id, 'completed', bytesWritten);
+> 124 |                             controller.close();
+      |                                        ^
+  125 |                             break;
+  126 |                         }
+  127 | {
+  code: 'ERR_INVALID_STATE'
+}
+ GET /api/download-stream?url=https%3A%2F%2Fmedia.w3.org%2F2010%2F05%2Fsintel%2Ftrailer.mp4 200 in 320ms (compile: 4ms, render: 317ms)
