@@ -1,4 +1,4 @@
-import { isSafeUrl } from "./server-security";
+import { isSafeUrl } from "@/utils/urlSecurity";
 
 const DEFAULT_MAX_REDIRECTS = 5;
 
@@ -68,8 +68,8 @@ export async function fetchUpstreamWithRedirects(
   sourceUrl: string,
   options: FetchUpstreamWithRedirectsOptions = {},
 ): Promise<Response> {
-  if (!isHttpUrl(sourceUrl)) {
-    throw new Error("Only HTTP(S) upstream URLs are supported.");
+  if (!(await isSafeUrl(sourceUrl))) {
+    throw new Error("Only public HTTP(S) upstream URLs are supported.");
   }
 
   const method = options.method ?? "GET";
@@ -78,7 +78,9 @@ export async function fetchUpstreamWithRedirects(
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
     // Validate the current URL against SSRF
-    await isSafeUrl(currentUrl);
+    if (!(await isSafeUrl(currentUrl))) {
+        throw new Error("Upstream URL is unsafe.");
+    }
 
     const response = await fetch(currentUrl, {
       method,
@@ -113,6 +115,13 @@ export async function fetchUpstreamWithRedirects(
     if (!isHttpUrl(nextUrl)) {
       response.body?.cancel().catch(() => undefined);
       throw new Error("Upstream redirect uses an unsupported protocol.");
+    }
+
+    // Explicitly validate nextUrl here as well, although loop will catch it.
+    // The original code had a check here, let's keep it for safety/early fail.
+    if (!(await isSafeUrl(nextUrl))) {
+      response.body?.cancel().catch(() => undefined);
+      throw new Error("Upstream redirect location is unsafe or unsupported.");
     }
 
     response.body?.cancel().catch(() => undefined);

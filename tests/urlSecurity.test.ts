@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from "bun:test";
-import { isSafeUrl } from "../utils/server-security";
+import { isSafeUrl } from "@/utils/urlSecurity";
 
 // Mock dns.lookup
 mock.module("node:dns/promises", () => {
@@ -25,61 +25,61 @@ mock.module("node:dns/promises", () => {
     };
 });
 
-describe("isSafeUrl", () => {
+describe("isSafeUrl (via utils/urlSecurity)", () => {
     it("should allow public HTTP URLs", async () => {
-        await expect(isSafeUrl("http://public.com/foo")).resolves.toBeUndefined();
+        await expect(isSafeUrl("http://public.com/foo")).resolves.toBe(true);
     });
 
     it("should allow public HTTPS URLs", async () => {
-        await expect(isSafeUrl("https://public.com/foo")).resolves.toBeUndefined();
+        await expect(isSafeUrl("https://public.com/foo")).resolves.toBe(true);
     });
 
     it("should block localhost hostname", async () => {
-        await expect(isSafeUrl("http://localhost:3000")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://localhost:3000")).resolves.toBe(false);
     });
 
     it("should block 127.0.0.1 IP directly", async () => {
-        await expect(isSafeUrl("http://127.0.0.1:3000")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://127.0.0.1:3000")).resolves.toBe(false);
     });
 
     it("should block private IPv4 hostname", async () => {
-        await expect(isSafeUrl("http://private-ipv4.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://private-ipv4.com")).resolves.toBe(false);
     });
 
     it("should block IPv6 loopback hostname", async () => {
-        await expect(isSafeUrl("http://ipv6-loopback.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://ipv6-loopback.com")).resolves.toBe(false);
     });
 
     it("should block IPv6 unique local hostname", async () => {
-        await expect(isSafeUrl("http://ipv6-private.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://ipv6-private.com")).resolves.toBe(false);
     });
 
     it("should block IPv6 unspecified hostname", async () => {
-        await expect(isSafeUrl("http://ipv6-unspecified.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://ipv6-unspecified.com")).resolves.toBe(false);
     });
 
     it("should block 0.0.0.0 hostname", async () => {
-        await expect(isSafeUrl("http://zero.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://zero.com")).resolves.toBe(false);
     });
 
     it("should allow public IPv6 hostname", async () => {
-        await expect(isSafeUrl("http://ipv6-public.com")).resolves.toBeUndefined();
+        await expect(isSafeUrl("http://ipv6-public.com")).resolves.toBe(true);
     });
 
     it("should block if ANY resolved IP is private", async () => {
         // mixed.com resolves to 8.8.8.8 (public) AND 127.0.0.1 (private)
-        await expect(isSafeUrl("http://mixed.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://mixed.com")).resolves.toBe(false);
     });
 
     it("should block IPv4-mapped IPv6 loopback", async () => {
-        await expect(isSafeUrl("http://mapped-ipv4.com")).rejects.toThrow("Access to private IP");
+        await expect(isSafeUrl("http://mapped-ipv4.com")).resolves.toBe(false);
     });
 
     it("should block non-http protocols", async () => {
-        await expect(isSafeUrl("ftp://public.com")).rejects.toThrow("Invalid protocol");
+        await expect(isSafeUrl("ftp://public.com")).resolves.toBe(false);
     });
 
     it("should fail on invalid URL", async () => {
-        await expect(isSafeUrl("not-a-url")).rejects.toThrow("Invalid URL format");
+        await expect(isSafeUrl("not-a-url")).resolves.toBe(false);
     });
 });

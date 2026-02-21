@@ -19,15 +19,15 @@ export async function GET(req: NextRequest) {
         return new NextResponse('Missing URL', { status: 400 });
     }
 
-    StorageManager.ensureDirectory();
+    await StorageManager.ensureDirectory();
 
     // 1. Check DB for existing record
     let video = db.prepare('SELECT * FROM videos WHERE url = ?').get(url) as VideoRecord | undefined;
 
     // 2. If completely downloaded, serve from disk
-    if (video && video.status === 'completed' && StorageManager.fileExists(video.filename)) {
+    if (video && video.status === 'completed' && await StorageManager.fileExists(video.filename)) {
         const filePath = StorageManager.getFilePath(video.filename);
-        const stat = fs.statSync(filePath);
+        const stat = await fs.promises.stat(filePath);
         const fileSize = stat.size;
         const range = req.headers.get('range');
 
@@ -110,6 +110,7 @@ export async function GET(req: NextRequest) {
 
         const reader = upstreamRes.body.getReader();
         let bytesWritten = 0;
+        let lastUpdateBytes = 0;
 
         // Create a ReadableStream for the response
         const stream = new ReadableStream({
@@ -129,8 +130,9 @@ export async function GET(req: NextRequest) {
                         bytesWritten += value.length;
 
                         // Throttle DB updates (every 1MB roughly?)
-                        if (bytesWritten % (1024 * 1024) === 0) {
+                        if (bytesWritten - lastUpdateBytes >= (1024 * 1024)) {
                             updateStatus(video!.id, 'downloading', bytesWritten);
+                            lastUpdateBytes = bytesWritten;
                         }
 
                         // 2. Send to client
