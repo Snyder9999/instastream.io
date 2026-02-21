@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ffmpeg from "fluent-ffmpeg";
 import { randomUUID } from "node:crypto";
-import { appendFileSync } from "node:fs";
+import { appendFile } from "node:fs/promises";
 import path from "node:path";
 import { PassThrough, Readable } from "node:stream";
 
@@ -30,9 +30,9 @@ type ErrorBody = {
   maxActiveTranscodes?: number;
 };
 
-function logLine(line: string) {
+async function logLine(line: string) {
   try {
-    appendFileSync(logPath, line);
+    await appendFile(logPath, line);
   } catch {
     // Logging must never crash the request path.
   }
