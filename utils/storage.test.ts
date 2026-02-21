@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 
 describe("StorageManager.generateFilename", () => {
+  // Resolved conflicts between master and feature branch
   // --- Existing tests from master ---
   test("should preserve allowed extensions", () => {
     const urls = [
